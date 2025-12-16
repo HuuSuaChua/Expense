@@ -4,12 +4,14 @@ import AddExpense from "@/components/AddExpense";
 import ExpenseList from "@/components/ExpenseList";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import AddCategory from "@/components/AddCategory";
 import LogoutButton from "@/components/LogoutButton";
+import ChatModal from "@/components/ChatModal";   // 👈 thêm
+import UserList from "@/components/UserList";
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
-
+  const [openChat, setOpenChat] = useState(false);
+  const [chatUserId, setChatUserId] = useState<string | null>(null);
   useEffect(() => {
     const checkAuth = async () => {
       const {
@@ -31,17 +33,42 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Home</h1><LogoutButton/>
-      </div>
-      <AddCategory/>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <AddExpense />
-        <div className="lg:col-span-2 card">
-          <ExpenseList />
+    <>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Home</h1>
+
+          <div className="flex gap-2">
+            <LogoutButton />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          <AddExpense />
+          <div className="lg:col-span-2 card">
+            <>
+              {/* danh sách user */}
+              <UserList
+                onSelectUser={(userId) => {
+                  setChatUserId(userId);
+                  setOpenChat(true);
+                }}
+              />
+
+              {/* modal chat */}
+              {chatUserId && (
+                <ChatModal
+                  open={openChat}
+                  otherUserId={chatUserId} // 👈 TRUYỀN USER ID
+                  onClose={() => setOpenChat(false)}
+                />
+              )}
+            </>
+          </div>
+          <div className="lg:col-span-2 card">
+            <ExpenseList />
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -22,53 +22,91 @@ type Expense = {
 export default function ExpenseList() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<number | "all">("all");
+  const [selectedCategory, setSelectedCategory] =
+    useState<number | "all">("all");
+  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // 4️⃣ Realtime expenses
+useEffect(() => {
+  if (!userId) return;
+
+  const channel = supabase
+    .channel("realtime-expenses")
+    .on(
+      "postgres_changes",
+      {
+        event: "*", // INSERT | UPDATE | DELETE
+        schema: "public",
+        table: "expenses",
+        filter: `user_id=eq.${userId}`,
+      },
+      () => {
+        fetchExpenses(); // 🔥 reload list
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [userId, selectedCategory]);
+
+  // 1️⃣ Lấy auth user
   useEffect(() => {
-    fetchCategories();
+    const fetchAuth = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) setUserId(user.id);
+    };
+
+    fetchAuth();
   }, []);
 
+  // 2️⃣ Fetch categories theo user
   useEffect(() => {
+    if (!userId) return;
+
+    const fetchCategories = async () => {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, name")
+        .eq("user_id", userId)
+        .order("name");
+
+      if (!error) {
+        setCategories(data || []);
+      }
+    };
+
+    fetchCategories();
+  }, [userId]);
+
+  // 3️⃣ Fetch expenses khi đổi category
+  useEffect(() => {
+    if (!userId) return;
+
     fetchExpenses();
-  }, [selectedCategory]);
+  }, [userId, selectedCategory]);
 
-  // Load categories
-  const fetchCategories = async () => {
-    const { data, error } = await supabase
-      .from("categories")
-      .select("id, name")
-      .order("name");
-
-    if (!error) {
-      setCategories(data || []);
-    }
-  };
-
-  // Load expenses
   const fetchExpenses = async () => {
     setLoading(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
     let query = supabase
       .from("expenses")
-      .select(`
+      .select(
+        `
         id,
         note,
         amount,
         created_at,
         category_id,
         categories ( name )
-      `)
-      .eq("user_id", user.id)
+      `
+      )
+      .eq("user_id", userId)
       .order("created_at", { ascending: false });
 
     if (selectedCategory !== "all") {
@@ -78,20 +116,22 @@ export default function ExpenseList() {
     const { data, error } = await query;
 
     if (!error) {
-  setExpenses(
-    (data || []).map((item: any) => ({
-      ...item,
-      categories: item.categories[0] || null,
-    }))
-  );
-}
+      setExpenses(
+        (data || []).map((item: any) => ({
+          ...item,
+          categories: item.categories?.[0] || null,
+        }))
+      );
+    }
 
 
     setLoading(false);
   };
 
   if (loading) {
-    return <div className="text-center text-gray-400">Đang tải dữ liệu...</div>;
+    return (
+      <div className="text-center text-gray-400">Đang tải dữ liệu...</div>
+    );
   }
 
   return (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import AddCategory from "./AddCategory";
 
 type Category = {
   id: number;
@@ -13,44 +14,65 @@ export default function AddExpense() {
   const [note, setNote] = useState("");
   const [categoryId, setCategoryId] = useState<number | "">("");
   const [categories, setCategories] = useState<Category[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // 1️⃣ Lấy auth user
   useEffect(() => {
+    const fetchAuth = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+
+    fetchAuth();
+  }, []);
+
+  // 2️⃣ Fetch categories theo userId
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchCategories = async () => {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, name")
+        .eq("user_id", userId)
+        .order("id");
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      setCategories(data || []);
+    };
+
     fetchCategories();
-  }, [categories]);
+  }, [userId]);
 
-  const fetchCategories = async () => {
-    const { data, error } = await supabase
-      .from("categories")
-      .select("id, name")
-      .order("id");
-
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    setCategories(data || []);
-  };
-
+  // 3️⃣ Add expense
   const addExpense = async () => {
-    if (!amount || categoryId === "") return alert("Chưa chọn đủ trường");
-    setLoading(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      alert("Chưa đăng nhập");
-      setLoading(false);
+    if (!amount || categoryId === "") {
+      alert("Chưa chọn đủ trường");
       return;
     }
+
+    if (!userId) {
+      alert("Chưa đăng nhập");
+      return;
+    }
+
+    setLoading(true);
 
     const { error } = await supabase.from("expenses").insert({
-      note: String(note),
+      note,
       amount: Number(amount),
       category_id: categoryId,
-      user_id: user.id,
+      user_id: userId,
     });
 
     setLoading(false);
@@ -60,6 +82,8 @@ export default function AddExpense() {
       alert(error.message);
       return;
     }
+
+    // reset form
     setNote("");
     setAmount("");
     setCategoryId("");
@@ -67,7 +91,10 @@ export default function AddExpense() {
 
   return (
     <div className="card space-y-3">
+      <AddCategory />
+
       <h3 className="font-bold">Thêm khoản chi</h3>
+
       <input
         className="input"
         type="number"
@@ -75,6 +102,7 @@ export default function AddExpense() {
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
       />
+
       <input
         className="input"
         placeholder="Note"
