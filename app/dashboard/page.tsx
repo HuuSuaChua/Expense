@@ -46,7 +46,6 @@ export default function Dashboard() {
            <div className="lg:col-span-3 card">
             <AddExpense />
            </div>
-          
           <div className="lg:col-span-3 card">
             <>
               {/* danh sách user */}
