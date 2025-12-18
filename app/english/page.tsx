@@ -113,7 +113,9 @@ export default function EnglishPage() {
         v.word.toLowerCase().includes(searchTerm.toLowerCase()) ||
         v.meaning.toLowerCase().includes(searchTerm.toLowerCase())
     );
-
+if (loading) {
+    return <div className="p-4">Đang kiểm tra đăng nhập...</div>;
+  }
     return (
         <div className="p-4 md:p-8 max-w-6xl mx-auto">
             <h1 className="text-4xl md:text-5xl font-extrabold mb-6 text-green-600 text-center">
