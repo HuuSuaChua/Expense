@@ -41,7 +41,7 @@ export default function UserList({ onSelectUser }: Props) {
     <div
       className="
         w-full 
-        sm:w-100 
+        sm:w-80 
         bg-white 
         border 
         rounded-xl 

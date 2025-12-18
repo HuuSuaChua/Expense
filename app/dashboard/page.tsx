@@ -42,9 +42,12 @@ export default function Dashboard() {
             <LogoutButton />
           </div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-          <AddExpense />
-          <div className="lg:col-span-2 card">
+        <div className="grid grid-cols-1 lg:grid-cols-10 gap-4">
+           <div className="lg:col-span-3 card">
+            <AddExpense />
+           </div>
+          
+          <div className="lg:col-span-3 card">
             <>
               {/* danh sách user */}
               <UserList
@@ -64,7 +67,7 @@ export default function Dashboard() {
               )}
             </>
           </div>
-          <div className="lg:col-span-2 card">
+          <div className="lg:col-span-4 card">
             <ExpenseList />
           </div>
         </div>

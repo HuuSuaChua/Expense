@@ -24,7 +24,7 @@ export default function LoginPage() {
     if (error) {
       setError(error.message);
     } else {
-      alert("Đăng ký thành công! Hãy đăng nhập.");
+      alert("Đăng ký thành công! Hãy kiểm tra email để xác minh.");
       setIsRegister(false);
     }
   };
@@ -41,8 +41,10 @@ export default function LoginPage() {
     setLoading(false);
 
     if (error) {
+      console.log(error.message)
       setError(error.message);
     } else {
+
       window.location.href = "/dashboard";
     }
   };
