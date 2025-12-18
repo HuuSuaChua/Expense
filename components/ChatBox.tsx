@@ -98,47 +98,6 @@ export default function ChatBox({ otherUserId }: Props) {
     if (!contentToSend) setText("");
   };
 
-  /* ====================== UPLOAD HÌNH ====================== */
-  /* ====================== UPLOAD HÌNH ====================== */
-const handleUpload = async (file: File) => {
-  if (!userId) return;
-
-  try {
-    // Tạo tên file duy nhất
-    const fileName = `${Date.now()}_${file.name}`;
-
-    // Upload file lên bucket "chat-images"
-    const { error: uploadError } = await supabase.storage
-      .from("chat-images")
-      .upload(fileName, file);
-
-    if (uploadError) {
-      console.error("Upload image error:", uploadError.message);
-      return;
-    }
-
-    // Lấy public URL của file vừa upload
-    const { data: publicData, error: publicError } = supabase.storage
-      .from("chat-images")
-      .getPublicUrl(fileName);
-
-    if (publicError) {
-      console.error("Get public URL error:", publicError.message);
-      return;
-    }
-
-    const publicUrl = publicData.publicUrl;
-    if (!publicUrl) {
-      console.error("Public URL not found");
-      return;
-    }
-
-    // Gửi tin nhắn chứa URL hình
-    sendMessage(publicUrl);
-  } catch (err) {
-    console.error("Upload failed:", err);
-  }
-};
 
 
 
@@ -187,7 +146,7 @@ const handleUpload = async (file: File) => {
       </div>
 
       {/* Input & Upload */}
-      <div style={{ display: "flex", padding: 8 }}>
+      {/* <div style={{ display: "flex", padding: 8 }}>
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -211,7 +170,7 @@ const handleUpload = async (file: File) => {
         <button onClick={() => sendMessage()} style={{ marginLeft: 6 }}>
           Gửi
         </button>
-      </div>
+      </div> */}
     </div>
   );
 }
