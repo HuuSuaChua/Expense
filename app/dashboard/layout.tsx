@@ -18,6 +18,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             📚 Learn English
           </a>
         </nav>
+        <nav className="flex flex-col gap-3">
+          <a
+            href="/noel"
+            className="px-4 py-2 rounded-lg text-gray-700 hover:bg-indigo-100 hover:text-indigo-700 transition-all"
+          >
+            🎅 Merry
+          </a>
+        </nav>
       </aside>
 
       {/* Main content */}

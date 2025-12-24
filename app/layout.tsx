@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Quản lý chi tiêu cá nhân",
+    default: "LOVE Trần Hồng Thương",
     template: "%s | Expense Tracker",
   },
   description:

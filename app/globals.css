@@ -1,4 +1,107 @@
 @import "tailwindcss";
+* {
+  box-sizing: border-box;
+}
+/* Chữ hiện lên mượt */
+@keyframes christmasFade {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-christmas-fade {
+  animation: christmasFade 1.5s ease-out forwards;
+}
+
+/* Tuyết rơi */
+@keyframes snowFall {
+  0% {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(120px);
+    opacity: 0;
+  }
+}
+@keyframes snow {
+  0% {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+}
+
+.animate-snow {
+  animation: snow linear infinite;
+}
+
+.animate-snow-fall {
+  animation: snowFall 3s linear infinite;
+}
+
+body {
+  margin: 0;
+  background: #0b1c2d;
+  font-family: system-ui, sans-serif;
+}
+
+.container {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.tree {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.layer {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 4px 0;
+}
+
+.dot {
+  width: 14px;
+  height: 14px;
+  background: gold;
+  border-radius: 50%;
+  box-shadow: 0 0 12px gold;
+}
+
+.star {
+  color: gold;
+  font-size: 28px;
+  margin-bottom: 6px;
+  text-shadow: 0 0 18px gold;
+}
+
+.trunk {
+  width: 30px;
+  height: 40px;
+  background: #8b5a2b;
+  border-radius: 4px;
+  margin-top: 8px;
+}
 
 :root {
   --background: #ffffff;
