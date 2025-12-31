@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 // --- Types ---
 type Particle = { x: number; y: number; vx: number; vy: number; alpha: number; decay: number; color: string; size: number; sparkle: boolean; };
+type Rocket = { x: number; y: number; targetY: number; vx: number; vy: number; color: string; };
 type DroppingItem = { x: number; y: number; vy: number; image: HTMLImageElement | null; size: number; rotation: number; rotSpeed: number; };
 type Petal = { x: number; y: number; v: number; a: number; };
 type TextParticle = { x: number; y: number; baseX: number; baseY: number; vx: number; vy: number; color: string; size: number; ease: number; };
@@ -16,6 +17,7 @@ export default function PremiumFireworksNewYear() {
     const [isStarted, setIsStarted] = useState(false);
 
     const particles = useRef<Particle[]>([]);
+    const rockets = useRef<Rocket[]>([]);
     const droppingItems = useRef<DroppingItem[]>([]);
     const petals = useRef<Petal[]>([]);
     const textParticles = useRef<TextParticle[]>([]);
@@ -54,19 +56,33 @@ export default function PremiumFireworksNewYear() {
         Promise.all(promises).then(imgs => messengerImagesRef.current = imgs);
     }, []);
 
-    const shootFirework = (x: number, y: number) => {
+    const launchRocket = (canvas: HTMLCanvasElement) => {
+        const startX = Math.random() * canvas.width;
+        const targetY = Math.random() * (canvas.height * 0.4);
         const hue = Math.random() * 360;
-        // Responsive: Giảm số lượng hạt trên di động để tránh lag
+        
+        rockets.current.push({
+            x: startX,
+            y: canvas.height,
+            targetY: targetY,
+            vx: (Math.random() - 0.5) * 2,
+            vy: -(Math.random() * 4 + 8),
+            color: `hsl(${hue}, 100%, 70%)`
+        });
+    };
+
+    const shootFirework = (x: number, y: number, colorPrefix: string) => {
         const isMobile = window.innerWidth < 768;
-        const count = isMobile ? 2000 : 5000;
+        const count = isMobile ? 400 : 800;
 
         for (let i = 0; i < count; i++) {
             const a = Math.random() * Math.PI * 2;
-            const s = Math.random() * 8 + 5;
+            const s = Math.random() * 7 + 2;
             particles.current.push({
                 x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
-                alpha: 1, decay: Math.random() * 0.02 + 0.01,
-                color: `hsla(${hue},100%,70%,`, size: Math.random() * 2 + 1,
+                alpha: 1, decay: Math.random() * 0.02 + 0.015,
+                color: colorPrefix.replace(')', ','),
+                size: Math.random() * 2 + 1,
                 sparkle: Math.random() > 0.7
             });
         }
@@ -81,19 +97,20 @@ export default function PremiumFireworksNewYear() {
         if (index === messages.length - 1) {
             isHeartMode.current = true;
             stopCycle.current = true;
-            for (let i = 0; i < 8; i++) {
+            
+            for (let i = 0; i < 6; i++) {
                 setTimeout(() => {
-                    if (canvasRef.current) shootFirework(Math.random() * canvasRef.current.width, Math.random() * canvasRef.current.height * 0.6);
-                }, i * 2200);
+                    if (canvasRef.current) launchRocket(canvasRef.current);
+                }, i * 25000);
             }
+
             const newParticles: TextParticle[] = [];
             const centerX = canvas.width / 2;
             const centerY = canvas.height * 0.45;
-
-            // Responsive scale cho trái tim
             const baseScale = Math.min(canvas.width, canvas.height) / 45;
             const scale = window.innerWidth < 768 ? baseScale * 0.8 : baseScale;
 
+            // 1. Tạo hạt cho hình Trái Tim
             for (let i = 0; i < 2000; i++) {
                 const t = Math.random() * Math.PI * 2;
                 const tx = 16 * Math.pow(Math.sin(t), 3);
@@ -104,14 +121,33 @@ export default function PremiumFireworksNewYear() {
                     vx: 0, vy: 0, color: "hsl(350, 100%, 70%)", size: 2, ease: 0.05
                 });
             }
+
+            // 2. Tạo hạt cho chữ "HAPPY" nằm trên trái tim
+            const fontSize = window.innerWidth < 768 ? 40 : 80;
+            tCtx.fillStyle = "white";
+            tCtx.font = `900 ${fontSize}px Arial`;
+            tCtx.textAlign = "center";
+            tCtx.textBaseline = "middle";
+            tCtx.fillText("Iu Bé", centerX, centerY);
+
+            const data = tCtx.getImageData(0, 0, canvas.width, canvas.height).data;
+            const gap = window.innerWidth < 768 ? 5 : 3;
+
+            for (let y = 0; y < canvas.height; y += gap) {
+                for (let x = 0; x < canvas.width; x += gap) {
+                    if (data[(y * canvas.width + x) * 4 + 3] > 128) {
+                        newParticles.push({
+                            x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+                            baseX: x, baseY: y, vx: 0, vy: 0, color: "white", size: 2, ease: 0.08
+                        });
+                    }
+                }
+            }
+
             textParticles.current = newParticles;
         } else {
             isHeartMode.current = false;
-
-            // Responsive Font Size: Di động nhỏ hơn, Desktop lớn hơn
-            const fontSize = window.innerWidth < 768
-                ? Math.min(canvas.width / 5, 45) // Tablet/Mobile
-                : Math.min(canvas.width / 6, 100); // Desktop
+            const fontSize = window.innerWidth < 768 ? Math.min(canvas.width / 5, 45) : Math.min(canvas.width / 6, 100);
 
             tCtx.fillStyle = "white";
             tCtx.font = `900 ${fontSize}px Arial`;
@@ -121,7 +157,7 @@ export default function PremiumFireworksNewYear() {
 
             const data = tCtx.getImageData(0, 0, canvas.width, canvas.height).data;
             const newParticles: TextParticle[] = [];
-            const gap = window.innerWidth < 768 ? 6 : 4; // Giảm mật độ hạt trên di động cho mượt
+            const gap = window.innerWidth < 768 ? 6 : 4;
 
             for (let y = 0; y < canvas.height; y += gap) {
                 for (let x = 0; x < canvas.width; x += gap) {
@@ -159,6 +195,33 @@ export default function PremiumFireworksNewYear() {
             heartBeatRef.current += 0.01;
             const pulse = isHeartMode.current ? Math.sin(heartBeatRef.current * 3) * 0.1 + 1 : 1;
 
+            ctx.globalCompositeOperation = "lighter";
+            for (let i = rockets.current.length - 1; i >= 0; i--) {
+                const r = rockets.current[i];
+                r.x += r.vx; r.y += r.vy; r.vy += 0.1;
+                ctx.beginPath();
+                ctx.fillStyle = "#fff";
+                ctx.arc(r.x, r.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+                if (r.vy >= 0 || r.y <= r.targetY) {
+                    shootFirework(r.x, r.y, r.color);
+                    rockets.current.splice(i, 1);
+                }
+            }
+
+            for (let i = particles.current.length - 1; i >= 0; i--) {
+                const p = particles.current[i];
+                p.vx *= 0.98; p.vy *= 0.98;
+                p.x += p.vx; p.y += p.vy;
+                p.vy += 0.05;
+                p.alpha -= p.decay;
+                if (p.alpha <= 0) { particles.current.splice(i, 1); continue; }
+                const size = p.sparkle ? p.size * (Math.random() * 0.5 + 0.8) : p.size;
+                ctx.fillStyle = `${p.color}${p.alpha})`;
+                ctx.beginPath(); ctx.arc(p.x, p.y, size, 0, Math.PI * 2); ctx.fill();
+            }
+
+            ctx.globalCompositeOperation = "source-over";
             textParticles.current.forEach(p => {
                 const targetX = isHeartMode.current ? (p.baseX - canvas.width / 2) * pulse + canvas.width / 2 : p.baseX;
                 const targetY = isHeartMode.current ? (p.baseY - canvas.height * 0.45) * pulse + canvas.height * 0.45 : p.baseY;
@@ -175,28 +238,12 @@ export default function PremiumFireworksNewYear() {
                 ctx.translate(item.x, item.y);
                 ctx.rotate(item.rotation);
                 if (item.image) {
-                    ctx.shadowBlur = 10;
-                    ctx.shadowColor = "rgba(255,255,255,0.2)";
                     ctx.drawImage(item.image, -item.size / 2, -item.size / 2, item.size, item.size);
                 }
                 ctx.restore();
                 if (item.y > canvas.height + 200) droppingItems.current.splice(i, 1);
             });
 
-            ctx.globalCompositeOperation = "lighter";
-            for (let i = particles.current.length - 1; i >= 0; i--) {
-                const p = particles.current[i];
-                p.vx *= 0.985; p.vy *= 0.985;
-                p.x += p.vx; p.y += p.vy;
-                p.vy += 0.045;
-                p.alpha -= p.decay;
-                if (p.alpha <= 0) { particles.current.splice(i, 1); continue; }
-                const size = p.sparkle ? p.size * (Math.random() * 0.5 + 0.8) : p.size;
-                ctx.fillStyle = `${p.color}${p.alpha})`;
-                ctx.beginPath(); ctx.arc(p.x, p.y, size, 0, Math.PI * 2); ctx.fill();
-            }
-
-            ctx.globalCompositeOperation = "source-over";
             if (petals.current.length < 40) petals.current.push({ x: Math.random() * canvas.width, y: -20, v: Math.random() * 1 + 0.5, a: Math.random() * Math.PI });
             petals.current.forEach((pt, i) => {
                 pt.y += pt.v; pt.x += Math.sin(pt.a) * 0.5; pt.a += 0.01;
@@ -209,13 +256,12 @@ export default function PremiumFireworksNewYear() {
         };
 
         const fTimer = setInterval(() => {
-            shootFirework(Math.random() * canvas.width, Math.random() * (canvas.height * 0.5));
-        }, 2000);
+            launchRocket(canvas);
+        }, 1000);
 
         const dTimer = setInterval(() => {
             const img = messengerImagesRef.current[Math.floor(Math.random() * messengerImagesRef.current.length)];
             if (img) {
-                // Responsive size ảnh rơi
                 const imgSize = window.innerWidth < 768 ? 60 : 110;
                 droppingItems.current.push({
                     x: Math.random() * canvas.width, y: -150, vy: Math.random() * 1 + 1.2,
@@ -229,7 +275,7 @@ export default function PremiumFireworksNewYear() {
                 msgIndex.current = (msgIndex.current + 1) % messages.length;
                 createShape(msgIndex.current, canvas);
             }
-        }, 2000);
+        }, 2200);
 
         animate();
         return () => {
@@ -243,7 +289,6 @@ export default function PremiumFireworksNewYear() {
         <div className="fixed inset-0 bg-black overflow-hidden font-sans select-none touch-none">
             <canvas ref={canvasRef} className="w-full h-full block" />
 
-            {/* 1. Nút bấm bắt đầu - Responsive Text */}
             {!isReady && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-[60] px-4">
                     <button
@@ -255,14 +300,11 @@ export default function PremiumFireworksNewYear() {
                 </div>
             )}
 
-            {/* 2. Màn hình đếm ngược - Responsive Size */}
             {isReady && !isStarted && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black z-50">
                     <div className="relative flex items-center justify-center">
-                        {/* Vòng tròn hiệu ứng responsive */}
                         <div className="absolute w-[12rem] h-[12rem] md:w-[20rem] md:h-[20rem] border-4 border-aqua/20 rounded-full animate-ping"></div>
                         <div className="absolute w-[14rem] h-[14rem] md:w-[22rem] md:h-[22rem] border-2 border-aqua/10 rounded-full animate-pulse"></div>
-
                         <span className="text-white text-[8rem] md:text-[15rem] font-black drop-shadow-[0_0_50px_rgba(0,255,255,0.8)] z-10">
                             {countdown}
                         </span>
