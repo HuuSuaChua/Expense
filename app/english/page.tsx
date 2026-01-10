@@ -100,13 +100,48 @@ export default function EnglishPage() {
     setDeletingId(null);
   };
 
+  // const speakEnglish = (text: string) => {
+  //   const utterance = new SpeechSynthesisUtterance(text);
+  //   utterance.lang = "en-US";
+  //   window.speechSynthesis.cancel();
+  //   window.speechSynthesis.speak(utterance);
+  // };
+
   const speakEnglish = (text: string) => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US";
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+  // 1. Hủy các yêu cầu đọc đang chờ để tránh chồng chéo
+  window.speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  
+  // 2. Thiết lập ngôn ngữ đích
+  utterance.lang = "en-US";
+  utterance.rate = 1.0; // Tốc độ đọc (0.1 đến 10)
+  utterance.pitch = 1.0; // Độ cao (0 đến 2)
+
+  // 3. Hàm tìm và gán giọng đọc tiếng Anh chuẩn
+  const setEnglishVoice = () => {
+    const voices = window.speechSynthesis.getVoices();
+    
+    // Tìm giọng en-US, ưu tiên các giọng có tên "Google" hoặc "Samantha" (giọng chuẩn của Apple)
+    const englishVoice = voices.find(v => v.lang === "en-US" && v.name.includes("Samantha")) 
+                      || voices.find(v => v.lang === "en-US")
+                      || voices.find(v => v.lang.startsWith("en"));
+
+    if (englishVoice) {
+      utterance.voice = englishVoice;
+    }
   };
 
+  // 4. Thực thi
+  setEnglishVoice();
+
+  // Đặc biệt cho Chrome/Safari: Danh sách voice có thể chưa tải xong ngay lập tức
+  if (window.speechSynthesis.onvoiceschanged !== undefined) {
+    window.speechSynthesis.onvoiceschanged = setEnglishVoice;
+  }
+
+  window.speechSynthesis.speak(utterance);
+};
   const filteredVocabularies = vocabularies.filter(
     (v) =>
       v.word.toLowerCase().includes(searchTerm.toLowerCase()) ||
