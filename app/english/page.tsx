@@ -9,6 +9,8 @@ type Vocabulary = {
   meaning: string;
   example_sentence: string;
   status: string;
+  image?: string | null;
+  created_at?: string;
 };
 
 export default function EnglishPage() {
@@ -17,6 +19,28 @@ export default function EnglishPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "learned" | "unlearned">("all");
+  const [timeFilter, setTimeFilter] = useState<
+    "all" | "today" | "7days" | "newest" | "oldest"
+  >("all");
+  const [dateFilter, setDateFilter] = useState<string>("");
+
+  // image 
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  //detail
+  const [selectedVocab, setSelectedVocab] = useState<Vocabulary | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const openDetail = (vocab: Vocabulary) => {
+    setSelectedVocab(vocab);
+    setIsDetailOpen(true);
+  };
+
+  const closeDetail = () => {
+    setIsDetailOpen(false);
+    setSelectedVocab(null);
+  };
 
   // Form & Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,6 +76,23 @@ export default function EnglishPage() {
       console.error(error);
     }
   };
+  const uploadImage = async (file: File) => {
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${crypto.randomUUID()}.${fileExt}`;
+    const filePath = `images/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from("vocabularies")
+      .upload(filePath, file);
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from("vocabularies")
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  };
 
   /* ================= CRUD ACTIONS ================= */
   const addVocabulary = async (e: React.FormEvent) => {
@@ -60,20 +101,40 @@ export default function EnglishPage() {
 
     setAdding(true);
     try {
+      let imageUrl: string | null = null;
+
+      if (imageFile) {
+        imageUrl = await uploadImage(imageFile);
+      }
+
       const { data, error } = await supabase
         .from("vocabularies")
-        .insert([{ word, meaning, example_sentence: example, status: "unlearned" }])
+        .insert([{
+          word,
+          meaning,
+          example_sentence: example,
+          status: "unlearned",
+          image: imageUrl,
+        }])
         .select();
 
       if (error) throw error;
+
       setVocabularies((prev) => [data[0], ...prev]);
-      setWord(""); setMeaning(""); setExample("");
+
+      // reset form
+      setWord("");
+      setMeaning("");
+      setExample("");
+      setImageFile(null);
+      setImagePreview(null);
       setIsModalOpen(false);
     } catch (error) {
       console.error(error);
     }
     setAdding(false);
   };
+
 
   const updateStatus = async (id: string, newStatus: string) => {
     setUpdatingId(id);
@@ -108,45 +169,96 @@ export default function EnglishPage() {
   // };
 
   const speakEnglish = (text: string) => {
-  // 1. Hủy các yêu cầu đọc đang chờ để tránh chồng chéo
-  window.speechSynthesis.cancel();
+    // 1. Hủy các yêu cầu đọc đang chờ để tránh chồng chéo
+    window.speechSynthesis.cancel();
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  
-  // 2. Thiết lập ngôn ngữ đích
-  utterance.lang = "en-US";
-  utterance.rate = 1.0; // Tốc độ đọc (0.1 đến 10)
-  utterance.pitch = 1.0; // Độ cao (0 đến 2)
+    const utterance = new SpeechSynthesisUtterance(text);
 
-  // 3. Hàm tìm và gán giọng đọc tiếng Anh chuẩn
-  const setEnglishVoice = () => {
-    const voices = window.speechSynthesis.getVoices();
-    
-    // Tìm giọng en-US, ưu tiên các giọng có tên "Google" hoặc "Samantha" (giọng chuẩn của Apple)
-    const englishVoice = voices.find(v => v.lang === "en-US" && v.name.includes("Samantha")) 
-                      || voices.find(v => v.lang === "en-US")
-                      || voices.find(v => v.lang.startsWith("en"));
+    // 2. Thiết lập ngôn ngữ đích
+    utterance.lang = "en-US";
+    utterance.rate = 1.0; // Tốc độ đọc (0.1 đến 10)
+    utterance.pitch = 1.0; // Độ cao (0 đến 2)
 
-    if (englishVoice) {
-      utterance.voice = englishVoice;
+    // 3. Hàm tìm và gán giọng đọc tiếng Anh chuẩn
+    const setEnglishVoice = () => {
+      const voices = window.speechSynthesis.getVoices();
+
+      // Tìm giọng en-US, ưu tiên các giọng có tên "Google" hoặc "Samantha" (giọng chuẩn của Apple)
+      const englishVoice = voices.find(v => v.lang === "en-US" && v.name.includes("Samantha"))
+        || voices.find(v => v.lang === "en-US")
+        || voices.find(v => v.lang.startsWith("en"));
+
+      if (englishVoice) {
+        utterance.voice = englishVoice;
+      }
+    };
+
+    // 4. Thực thi
+    setEnglishVoice();
+
+    // Đặc biệt cho Chrome/Safari: Danh sách voice có thể chưa tải xong ngay lập tức
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = setEnglishVoice;
     }
+
+    window.speechSynthesis.speak(utterance);
   };
-
-  // 4. Thực thi
-  setEnglishVoice();
-
-  // Đặc biệt cho Chrome/Safari: Danh sách voice có thể chưa tải xong ngay lập tức
-  if (window.speechSynthesis.onvoiceschanged !== undefined) {
-    window.speechSynthesis.onvoiceschanged = setEnglishVoice;
-  }
-
-  window.speechSynthesis.speak(utterance);
-};
-  const filteredVocabularies = vocabularies.filter(
-    (v) =>
+  const filteredVocabularies = vocabularies
+    // 🔍 Search
+    .filter((v) =>
       v.word.toLowerCase().includes(searchTerm.toLowerCase()) ||
       v.meaning.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    )
+    // ✅ Status filter
+    .filter((v) => {
+      if (statusFilter === "all") return true;
+      return v.status === statusFilter;
+    })
+    // 📅 Filter theo ngày cụ thể
+    .filter((v) => {
+      if (!dateFilter || !v.created_at) return true;
+
+      const d = new Date(v.created_at);
+
+      const localDate =
+        d.getFullYear() +
+        "-" +
+        String(d.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(d.getDate()).padStart(2, "0");
+
+      return localDate === dateFilter;
+    })
+
+    // 🕒 Time filter
+    .filter((v) => {
+      if (timeFilter === "all" || !v.created_at) return true;
+
+      const createdAt = new Date(v.created_at);
+      const now = new Date();
+
+      if (timeFilter === "today") {
+        return createdAt.toDateString() === now.toDateString();
+      }
+
+      if (timeFilter === "7days") {
+        const diff = now.getTime() - createdAt.getTime();
+        return diff <= 7 * 24 * 60 * 60 * 1000;
+      }
+
+      return true;
+    })
+    // 🔃 Sort
+    .sort((a, b) => {
+      if (timeFilter === "newest") {
+        return new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime();
+      }
+      if (timeFilter === "oldest") {
+        return new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime();
+      }
+      return 0;
+    });
+
 
   if (loading) return (
     <div className="h-screen flex items-center justify-center text-green-600 font-medium italic">
@@ -156,7 +268,7 @@ export default function EnglishPage() {
 
   return (
     <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
-      
+
       {/* 1. HEADER & SEARCH (Cố định ở trên) */}
       <header className="flex-shrink-0 p-4 sm:p-6 md:p-8 w-full max-w-7xl mx-auto">
         <h1 className="text-3xl sm:text-4xl font-black mb-6 text-green-600 text-center tracking-tight">
@@ -171,6 +283,111 @@ export default function EnglishPage() {
           />
           <span className="absolute right-4 top-4 text-gray-400 pointer-events-none">🔍</span>
         </div>
+        <div className="mt-6 px-2">
+          <div
+            className="
+      max-w-4xl mx-auto
+      bg-white/70 backdrop-blur-md
+      rounded-2xl
+      p-4
+      shadow-sm
+      ring-1 ring-gray-200
+    "
+          >
+            <div
+              className="
+        grid grid-cols-1
+        sm:grid-cols-2
+        lg:grid-cols-4
+        gap-3
+      "
+            >
+              {/* Status filter */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="
+          w-full
+          px-4 py-2.5
+          rounded-xl
+          bg-white
+          ring-1 ring-gray-200
+          text-sm font-semibold
+          focus:ring-2 focus:ring-green-400
+          outline-none
+        "
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="learned">Đã thuộc</option>
+                <option value="unlearned">Chưa thuộc</option>
+              </select>
+
+              {/* Time filter */}
+              <select
+                value={timeFilter}
+                onChange={(e) => setTimeFilter(e.target.value as any)}
+                className="
+          w-full
+          px-4 py-2.5
+          rounded-xl
+          bg-white
+          ring-1 ring-gray-200
+          text-sm font-semibold
+          focus:ring-2 focus:ring-green-400
+          outline-none
+        "
+              >
+                <option value="all">Mọi thời gian</option>
+                <option value="today">Hôm nay</option>
+                <option value="7days">7 ngày gần đây</option>
+                <option value="newest">Mới nhất</option>
+                <option value="oldest">Cũ nhất</option>
+              </select>
+
+              {/* Date filter */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="
+            flex-1
+            px-4 py-2.5
+            rounded-xl
+            bg-white
+            ring-1 ring-gray-200
+            text-sm font-semibold
+            focus:ring-2 focus:ring-green-400
+            outline-none
+          "
+                />
+                {dateFilter && (
+                  <button
+                    onClick={() => setDateFilter("")}
+                    className="
+              px-3 py-2
+              rounded-xl
+              text-xs font-bold
+              text-red-500
+              bg-red-50
+              hover:bg-red-100
+              transition
+            "
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Hint / label (desktop only) */}
+              <div className="hidden lg:flex items-center justify-center text-xs text-gray-400 font-semibold">
+                Lọc từ vựng
+              </div>
+            </div>
+          </div>
+        </div>
+
+
       </header>
 
       {/* 2. SCROLLABLE LIST (Vùng cuộn chính) */}
@@ -179,20 +396,26 @@ export default function EnglishPage() {
           {filteredVocabularies.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {filteredVocabularies.map((v) => (
-                <div key={v.id} className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-all group">
+                <div key={v.id} onClick={() => openDetail(v)} className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-all group">
                   <div>
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex items-center gap-2">
                         <h2 className="text-xl font-bold text-gray-800 group-hover:text-green-600 transition-colors">{v.word}</h2>
-                        <button 
-                          onClick={() => speakEnglish(v.word)} 
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            speakEnglish(v.word);
+                          }}
                           className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-all"
                         >
                           🔊
                         </button>
                       </div>
-                      <button 
-                        onClick={() => deleteVocabulary(v.id)} 
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteVocabulary(v.id);
+                        }}
                         className="text-gray-300 hover:text-red-500 p-1"
                         title="Delete"
                       >
@@ -210,12 +433,12 @@ export default function EnglishPage() {
                   <div className="mt-5 pt-4 border-t border-gray-50 flex items-center justify-between">
                     <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Trạng thái</span>
                     <select
+                      onClick={(e) => e.stopPropagation()}
                       value={v.status}
                       onChange={(e) => updateStatus(v.id, e.target.value)}
                       disabled={updatingId === v.id}
-                      className={`text-xs font-bold px-3 py-1.5 rounded-full border-none outline-none cursor-pointer appearance-none transition-colors ${
-                        v.status === "learned" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
-                      }`}
+                      className={`text-xs font-bold px-3 py-1.5 rounded-full border-none outline-none cursor-pointer appearance-none transition-colors ${v.status === "learned" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
+                        }`}
                     >
                       <option value="unlearned">Chưa thuộc</option>
                       <option value="learned">Đã thuộc</option>
@@ -243,11 +466,11 @@ export default function EnglishPage() {
       {/* 4. MODAL OVERLAY */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div 
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300" 
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300"
             onClick={() => setIsModalOpen(false)}
           ></div>
-          
+
           <div className="bg-white rounded-[2rem] p-8 w-full max-w-md relative z-10 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-8">
               <h2 className="text-2xl font-black text-gray-800 tracking-tight">THÊM TỪ MỚI</h2>
@@ -284,6 +507,37 @@ export default function EnglishPage() {
                   onChange={(e) => setExample(e.target.value)}
                 />
               </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">
+                  Hình minh hoạ
+                </label>
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setImageFile(file);
+                    setImagePreview(URL.createObjectURL(file));
+                  }}
+                  className="block w-full text-sm text-gray-500
+      file:mr-4 file:py-2 file:px-4
+      file:rounded-full file:border-0
+      file:text-sm file:font-semibold
+      file:bg-green-50 file:text-green-700
+      hover:file:bg-green-100"
+                />
+
+                {imagePreview && (
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="mt-3 w-full h-40 object-cover rounded-xl border"
+                  />
+                )}
+              </div>
+
               <button
                 type="submit"
                 disabled={adding}
@@ -295,6 +549,79 @@ export default function EnglishPage() {
           </div>
         </div>
       )}
+      {isDetailOpen && selectedVocab && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Overlay */}
+          <div
+            onClick={closeDetail}
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in"
+          />
+
+          {/* Modal */}
+          <div className="relative z-10 w-full max-w-lg bg-white rounded-3xl p-8 shadow-2xl animate-in zoom-in-95">
+            <button
+              onClick={closeDetail}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-500 transition"
+            >
+              ✕
+            </button>
+
+            {/* Image */}
+            {selectedVocab.image && (
+              <div className="w-full max-h-[40vh] sm:max-h-[50vh] overflow-hidden rounded-2xl mb-6 bg-gray-100">
+                <img
+                  src={selectedVocab.image}
+                  alt={selectedVocab.word}
+                  className="w-full h-full object-contain sm:object-cover"
+                />
+              </div>
+            )}
+
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <h2 className="text-3xl font-black text-green-600">
+                  {selectedVocab.word}
+                </h2>
+                <button
+                  onClick={() => speakEnglish(selectedVocab.word)}
+                  className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white transition"
+                >
+                  🔊
+                </button>
+              </div>
+
+              <p className="text-gray-700 text-lg leading-relaxed">
+                <span className="font-bold text-gray-900">Nghĩa:</span>{" "}
+                {selectedVocab.meaning}
+              </p>
+
+              {selectedVocab.example_sentence && (
+                <div className="bg-gray-50 border-l-4 border-green-400 rounded-xl p-4">
+                  <p className="italic text-gray-600">
+                    "{selectedVocab.example_sentence}"
+                  </p>
+                </div>
+              )}
+
+              <div className="pt-4 border-t flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-widest text-gray-400">
+                  Trạng thái
+                </span>
+                <span
+                  className={`text-xs font-bold px-3 py-1.5 rounded-full ${selectedVocab.status === "learned"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-orange-100 text-orange-700"
+                    }`}
+                >
+                  {selectedVocab.status === "learned" ? "Đã thuộc" : "Chưa thuộc"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
