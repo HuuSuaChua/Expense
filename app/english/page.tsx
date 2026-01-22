@@ -65,9 +65,12 @@ export default function EnglishPage() {
 
   const fetchVocabularies = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
       const { data, error } = await supabase
         .from("vocabularies")
         .select("*")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -106,7 +109,9 @@ export default function EnglishPage() {
       if (imageFile) {
         imageUrl = await uploadImage(imageFile);
       }
-
+    // 1. Lấy thông tin user hiện tại
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return alert("Phiên đăng nhập hết hạn!");
       const { data, error } = await supabase
         .from("vocabularies")
         .insert([{
@@ -115,6 +120,7 @@ export default function EnglishPage() {
           example_sentence: example,
           status: "unlearned",
           image: imageUrl,
+          user_id: user.id,
         }])
         .select();
 
