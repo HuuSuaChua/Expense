@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import {
+  Search, Plus, Volume2, Trash2, CheckCircle2,
+  Circle, X, Calendar, Filter, Image as ImageIcon,
+  Loader2, ChevronDown, BookOpen
+} from "lucide-react";
 
 type Vocabulary = {
   id: string;
@@ -20,30 +25,15 @@ export default function EnglishPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "learned" | "unlearned">("all");
-  const [timeFilter, setTimeFilter] = useState<
-    "all" | "today" | "7days" | "newest" | "oldest"
-  >("all");
+  const [timeFilter, setTimeFilter] = useState<"all" | "today" | "7days" | "newest" | "oldest">("all");
   const [dateFilter, setDateFilter] = useState<string>("");
 
-  // image 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-
-  //detail
   const [selectedVocab, setSelectedVocab] = useState<Vocabulary | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const openDetail = (vocab: Vocabulary) => {
-    setSelectedVocab(vocab);
-    setIsDetailOpen(true);
-  };
-
-  const closeDetail = () => {
-    setIsDetailOpen(false);
-    setSelectedVocab(null);
-  };
-
-  // Form & Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
+
   const [word, setWord] = useState("");
   const [meaning, setMeaning] = useState("");
   const [example, setExample] = useState("");
@@ -79,68 +69,36 @@ export default function EnglishPage() {
       console.error(error);
     }
   };
+
   const uploadImage = async (file: File) => {
     const fileExt = file.name.split(".").pop();
     const fileName = `${crypto.randomUUID()}.${fileExt}`;
     const filePath = `images/${fileName}`;
-
-    const { error } = await supabase.storage
-      .from("vocabularies")
-      .upload(filePath, file);
-
+    const { error } = await supabase.storage.from("vocabularies").upload(filePath, file);
     if (error) throw error;
-
-    const { data } = supabase.storage
-      .from("vocabularies")
-      .getPublicUrl(filePath);
-
+    const { data } = supabase.storage.from("vocabularies").getPublicUrl(filePath);
     return data.publicUrl;
   };
 
-  /* ================= CRUD ACTIONS ================= */
+  /* ================= ACTIONS ================= */
   const addVocabulary = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!word || !meaning) return alert("Vui lòng nhập từ và nghĩa!");
-
     setAdding(true);
     try {
-      let imageUrl: string | null = null;
-
-      if (imageFile) {
-        imageUrl = await uploadImage(imageFile);
-      }
-    // 1. Lấy thông tin user hiện tại
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert("Phiên đăng nhập hết hạn!");
+      let imageUrl = imageFile ? await uploadImage(imageFile) : null;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
       const { data, error } = await supabase
         .from("vocabularies")
-        .insert([{
-          word,
-          meaning,
-          example_sentence: example,
-          status: "unlearned",
-          image: imageUrl,
-          user_id: user.id,
-        }])
+        .insert([{ word, meaning, example_sentence: example, status: "unlearned", image: imageUrl, user_id: user.id }])
         .select();
-
       if (error) throw error;
-
       setVocabularies((prev) => [data[0], ...prev]);
-
-      // reset form
-      setWord("");
-      setMeaning("");
-      setExample("");
-      setImageFile(null);
-      setImagePreview(null);
-      setIsModalOpen(false);
-    } catch (error) {
-      console.error(error);
-    }
+      setWord(""); setMeaning(""); setExample(""); setImageFile(null); setImagePreview(null); setIsModalOpen(false);
+    } catch (error) { console.error(error); }
     setAdding(false);
   };
-
 
   const updateStatus = async (id: string, newStatus: string) => {
     setUpdatingId(id);
@@ -148,9 +106,7 @@ export default function EnglishPage() {
       const { error } = await supabase.from("vocabularies").update({ status: newStatus }).eq("id", id);
       if (error) throw error;
       setVocabularies((prev) => prev.map((v) => (v.id === id ? { ...v, status: newStatus } : v)));
-    } catch (error) {
-      console.error(error);
-    }
+    } catch (error) { console.error(error); }
     setUpdatingId(null);
   };
 
@@ -158,476 +114,436 @@ export default function EnglishPage() {
     if (!confirm("Bạn có chắc muốn xoá từ này không?")) return;
     setDeletingId(id);
     try {
-      const { error } = await supabase.from("vocabularies").delete().eq("id", id);
-      if (error) throw error;
+      await supabase.from("vocabularies").delete().eq("id", id);
       setVocabularies((prev) => prev.filter((v) => v.id !== id));
-    } catch (error) {
-      console.error(error);
-    }
+    } catch (error) { console.error(error); }
     setDeletingId(null);
   };
 
-  // const speakEnglish = (text: string) => {
-  //   const utterance = new SpeechSynthesisUtterance(text);
-  //   utterance.lang = "en-US";
-  //   window.speechSynthesis.cancel();
-  //   window.speechSynthesis.speak(utterance);
-  // };
-
   const speakEnglish = (text: string) => {
-    // 1. Hủy các yêu cầu đọc đang chờ để tránh chồng chéo
     window.speechSynthesis.cancel();
-
     const utterance = new SpeechSynthesisUtterance(text);
-
-    // 2. Thiết lập ngôn ngữ đích
     utterance.lang = "en-US";
-    utterance.rate = 1.0; // Tốc độ đọc (0.1 đến 10)
-    utterance.pitch = 1.0; // Độ cao (0 đến 2)
-
-    // 3. Hàm tìm và gán giọng đọc tiếng Anh chuẩn
-    const setEnglishVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-
-      // Tìm giọng en-US, ưu tiên các giọng có tên "Google" hoặc "Samantha" (giọng chuẩn của Apple)
-      const englishVoice = voices.find(v => v.lang === "en-US" && v.name.includes("Samantha"))
-        || voices.find(v => v.lang === "en-US")
-        || voices.find(v => v.lang.startsWith("en"));
-
-      if (englishVoice) {
-        utterance.voice = englishVoice;
-      }
-    };
-
-    // 4. Thực thi
-    setEnglishVoice();
-
-    // Đặc biệt cho Chrome/Safari: Danh sách voice có thể chưa tải xong ngay lập tức
-    if (window.speechSynthesis.onvoiceschanged !== undefined) {
-      window.speechSynthesis.onvoiceschanged = setEnglishVoice;
-    }
-
+    utterance.rate = 1.0;
     window.speechSynthesis.speak(utterance);
   };
+
+  /* ================= FILTER LOGIC ================= */
   const filteredVocabularies = vocabularies
-    // 🔍 Search
-    .filter((v) =>
-      v.word.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.meaning.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    // ✅ Status filter
-    .filter((v) => {
-      if (statusFilter === "all") return true;
-      return v.status === statusFilter;
-    })
-    // 📅 Filter theo ngày cụ thể
+    .filter((v) => v.word.toLowerCase().includes(searchTerm.toLowerCase()) || v.meaning.toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter((v) => (statusFilter === "all" ? true : v.status === statusFilter))
     .filter((v) => {
       if (!dateFilter || !v.created_at) return true;
-
       const d = new Date(v.created_at);
-
-      const localDate =
-        d.getFullYear() +
-        "-" +
-        String(d.getMonth() + 1).padStart(2, "0") +
-        "-" +
-        String(d.getDate()).padStart(2, "0");
-
+      const localDate = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
       return localDate === dateFilter;
     })
-
-    // 🕒 Time filter
-    .filter((v) => {
-      if (timeFilter === "all" || !v.created_at) return true;
-
-      const createdAt = new Date(v.created_at);
-      const now = new Date();
-
-      if (timeFilter === "today") {
-        return createdAt.toDateString() === now.toDateString();
-      }
-
-      if (timeFilter === "7days") {
-        const diff = now.getTime() - createdAt.getTime();
-        return diff <= 7 * 24 * 60 * 60 * 1000;
-      }
-
-      return true;
-    })
-    // 🔃 Sort
     .sort((a, b) => {
-      if (timeFilter === "newest") {
-        return new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime();
-      }
-      if (timeFilter === "oldest") {
-        return new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime();
-      }
+      if (timeFilter === "newest") return new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime();
+      if (timeFilter === "oldest") return new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime();
       return 0;
     });
 
-
   if (loading) return (
-    <div className="h-screen flex items-center justify-center text-green-600 font-medium italic">
-      Đang kiểm tra đăng nhập...
+    <div className="h-screen flex flex-col items-center justify-center bg-white">
+      <Loader2 className="w-10 h-10 text-emerald-500 animate-spin mb-4" />
+      <p className="text-slate-500 font-medium animate-pulse">Đang đồng bộ dữ liệu...</p>
     </div>
   );
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 pb-20">
 
-      {/* 1. HEADER & SEARCH (Cố định ở trên) */}
-      <header className="flex-shrink-0 p-4 sm:p-6 md:p-8 w-full max-w-7xl mx-auto">
-        <h1 className="text-3xl sm:text-4xl font-black mb-6 text-green-600 text-center tracking-tight">
-          📚 ENGLISH VOCAB
-        </h1>
-        <div className="relative">
-          <input
-            className="w-full px-5 py-4 border-none rounded-2xl shadow-sm ring-1 ring-gray-200 focus:ring-2 focus:ring-green-500 outline-none transition-all text-lg"
-            placeholder="Search word or meaning..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <span className="absolute right-4 top-4 text-gray-400 pointer-events-none">🔍</span>
-        </div>
-        <div className="mt-6 px-2">
-          <div
-            className="
-      max-w-4xl mx-auto
-      bg-white/70 backdrop-blur-md
-      rounded-2xl
-      p-4
-      shadow-sm
-      ring-1 ring-gray-200
-    "
-          >
-            <div
-              className="
-        grid grid-cols-1
-        sm:grid-cols-2
-        lg:grid-cols-4
-        gap-3
-      "
-            >
-              {/* Status filter */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="
-          w-full
-          px-4 py-2.5
-          rounded-xl
-          bg-white
-          ring-1 ring-gray-200
-          text-sm font-semibold
-          focus:ring-2 focus:ring-green-400
-          outline-none
-        "
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="learned">Đã thuộc</option>
-                <option value="unlearned">Chưa thuộc</option>
-              </select>
+      {/* 1. HEADER & SEARCH */}
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <div className="bg-emerald-600 p-2.5 rounded-2xl shadow-lg shadow-emerald-100">
+                <BookOpen className="text-white" size={28} />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-800 tracking-tight uppercase">English Vocab</h1>
+                <p className="text-slate-400 text-xs font-bold tracking-widest">PERSONAL LEARNING HUB</p>
+              </div>
+            </div>
 
-              {/* Time filter */}
-              <select
-                value={timeFilter}
-                onChange={(e) => setTimeFilter(e.target.value as any)}
-                className="
-          w-full
-          px-4 py-2.5
-          rounded-xl
-          bg-white
-          ring-1 ring-gray-200
-          text-sm font-semibold
-          focus:ring-2 focus:ring-green-400
-          outline-none
-        "
-              >
-                <option value="all">Mọi thời gian</option>
-                <option value="today">Hôm nay</option>
-                <option value="7days">7 ngày gần đây</option>
-                <option value="newest">Mới nhất</option>
-                <option value="oldest">Cũ nhất</option>
-              </select>
+            <div className="relative flex-1 max-w-lg">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input
+                className="w-full pl-12 pr-4 py-3.5 bg-slate-100 border-2 border-transparent rounded-2xl focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all outline-none text-sm font-medium shadow-inner"
+                placeholder="Search words, meanings, examples..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
 
-              {/* Date filter */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="
-            flex-1
-            px-4 py-2.5
-            rounded-xl
-            bg-white
-            ring-1 ring-gray-200
-            text-sm font-semibold
-            focus:ring-2 focus:ring-green-400
-            outline-none
-          "
-                />
-                {dateFilter && (
+          {/* Quick Filters */}
+          {/* --- NÂNG CẤP BỘ LỌC (FILTER BAR) --- */}
+          <div className="mt-8 flex flex-col gap-6">
+
+            {/* 1. Thanh trạng thái (Status Chips) */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+              <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200/50 shadow-inner">
+                {[
+                  { id: 'all', label: 'Tất cả', icon: <BookOpen size={14} /> },
+                  { id: 'unlearned', label: 'Đang học', icon: <Circle size={14} className="text-amber-500" /> },
+                  { id: 'learned', label: 'Đã thuộc', icon: <CheckCircle2 size={14} className="text-emerald-500" /> }
+                ].map((item) => (
                   <button
-                    onClick={() => setDateFilter("")}
-                    className="
-              px-3 py-2
-              rounded-xl
-              text-xs font-bold
-              text-red-500
-              bg-red-50
-              hover:bg-red-100
-              transition
-            "
+                    key={item.id}
+                    onClick={() => setStatusFilter(item.id as any)}
+                    className={`
+            flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all duration-300
+            ${statusFilter === item.id
+                        ? "bg-white text-emerald-600 shadow-md scale-105"
+                        : "text-slate-400 hover:text-slate-600 hover:bg-white/50"
+                      }
+          `}
                   >
-                    ✕
+                    {item.icon}
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="h-8 w-[1px] bg-slate-200 mx-2 hidden md:block" />
+
+              {/* 2. Sắp xếp thời gian (Time Sort) */}
+              <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200/50 shadow-inner">
+                {[
+                  { id: 'newest', label: 'Mới nhất' },
+                  { id: 'oldest', label: 'Cũ nhất' }
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setTimeFilter(item.id as any)}
+                    className={`
+            px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all
+            ${timeFilter === item.id
+                        ? "bg-slate-800 text-white shadow-lg"
+                        : "text-slate-400 hover:text-slate-600"
+                      }
+          `}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. Bộ lọc nâng cao (Date & Advance) */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* --- NÂNG CẤP BỘ LỌC NGÀY THÁNG (PREMIUM DATE FILTER) --- */}
+              <div className="flex items-center gap-3">
+                <div className="relative group">
+                  {/* Label ẩn cho Accessibility */}
+                  <span className="sr-only">Lọc theo ngày</span>
+
+                  <div className={`
+      flex items-center gap-3 px-5 py-3 rounded-2xl border-2 transition-all duration-300 cursor-pointer
+      ${dateFilter
+                      ? "bg-emerald-600 border-emerald-500 shadow-lg shadow-emerald-100"
+                      : "bg-white border-slate-100 hover:border-emerald-300 shadow-sm"
+                    }
+    `}>
+                    {/* Icon Lịch */}
+                    <Calendar
+                      size={18}
+                      className={dateFilter ? "text-white" : "text-emerald-500"}
+                    />
+
+                    {/* Input Ngày - Ẩn phần thô, chỉ hiện icon và text */}
+                    <input
+                      type="date"
+                      value={dateFilter}
+                      onChange={(e) => setDateFilter(e.target.value)}
+                      className={`
+          bg-transparent text-xs font-bold uppercase tracking-widest outline-none cursor-pointer
+          ${dateFilter ? "text-white" : "text-slate-500"}
+        `}
+                    />
+
+                    {/* Nút Xóa nhanh (Chỉ hiện khi có ngày) */}
+                    {dateFilter && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setDateFilter("");
+                        }}
+                        className="ml-1 p-1 bg-white/20 hover:bg-white/40 rounded-lg transition-colors text-white"
+                      >
+                        <X size={14} strokeWidth={3} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Tooltip nhỏ khi di chuột vào (Dành cho máy tính) */}
+                  {!dateFilter && (
+                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1 bg-slate-800 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                      Lọc theo ngày tạo
+                    </div>
+                  )}
+                </div>
+
+                {/* Hiển thị nhanh "Hôm nay" - Shortcut */}
+                {!dateFilter && (
+                  <button
+                    onClick={() => {
+                      const today = new Date().toISOString().split('T')[0];
+                      setDateFilter(today);
+                    }}
+                    className="hidden sm:flex px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all"
+                  >
+                    Hôm nay
                   </button>
                 )}
               </div>
 
-              {/* Hint / label (desktop only) */}
-              <div className="hidden lg:flex items-center justify-center text-xs text-gray-400 font-semibold">
-                Lọc từ vựng
+              {/* Nút đếm số lượng nhanh */}
+              <div className="ml-auto px-5 py-3 bg-emerald-50 rounded-2xl border border-emerald-100">
+                <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-[0.2em]">
+                  Bộ sưu tập: <span className="text-sm ml-1">{filteredVocabularies.length} từ</span>
+                </p>
               </div>
             </div>
           </div>
         </div>
-
-
       </header>
 
-      {/* 2. SCROLLABLE LIST (Vùng cuộn chính) */}
-      <main className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 pb-32 scroll-smooth">
-        <div className="max-w-7xl mx-auto">
-          {filteredVocabularies.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {filteredVocabularies.map((v) => (
-                <div key={v.id} onClick={() => openDetail(v)} className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-all group">
-                  <div>
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-xl font-bold text-gray-800 group-hover:text-green-600 transition-colors">{v.word}</h2>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            speakEnglish(v.word);
-                          }}
-                          className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-all"
-                        >
-                          🔊
-                        </button>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteVocabulary(v.id);
-                        }}
-                        className="text-gray-300 hover:text-red-500 p-1"
-                        title="Delete"
+      {/* 2. MAIN LIST */}
+      <main className="max-w-6xl mx-auto px-4 py-10">
+        {filteredVocabularies.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredVocabularies.map((v) => (
+              <div
+                key={v.id}
+                onClick={() => { setSelectedVocab(v); setIsDetailOpen(true); }}
+                className="group relative bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden"
+              >
+                {/* Header Card */}
+                <div className="flex justify-between items-start mb-5">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); speakEnglish(v.word); }}
+                    className="w-11 h-11 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                  >
+                    <Volume2 size={20} />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteVocabulary(v.id); }}
+                    className="p-2 text-slate-200 hover:text-red-500 transition-colors"
+                  >
+                    {deletingId === v.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                  </button>
+                </div>
+
+                {/* Info */}
+                <h3 className="text-2xl font-bold text-slate-800 mb-2 leading-tight group-hover:text-emerald-600 transition-colors uppercase tracking-tight">
+                  {v.word}
+                </h3>
+                <p className="text-slate-600 font-medium mb-4 line-clamp-2 leading-relaxed italic">
+                  {v.meaning}
+                </p>
+
+                {/* Status Select Section */}
+                <div className="mt-6 pt-5 border-t border-slate-50 flex items-center justify-between">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Trạng thái</span>
+                    <div className="relative inline-block">
+                      <select
+                        onClick={(e) => e.stopPropagation()}
+                        value={v.status}
+                        onChange={(e) => updateStatus(v.id, e.target.value)}
+                        disabled={updatingId === v.id}
+                        className={`
+                          appearance-none pl-3 pr-8 py-1.5 rounded-xl text-[11px] font-bold uppercase tracking-wider cursor-pointer outline-none transition-all border-2
+                          ${v.status === "learned"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-100 hover:border-emerald-200"
+                            : "bg-amber-50 text-amber-700 border-amber-100 hover:border-amber-200"
+                          }
+                          ${updatingId === v.id ? "opacity-50" : ""}
+                        `}
                       >
-                        {deletingId === v.id ? "..." : "✕"}
-                      </button>
+                        <option value="unlearned">Chưa thuộc</option>
+                        <option value="learned">Đã thuộc</option>
+                      </select>
+                      <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
                     </div>
-                    <p className="text-gray-700 leading-relaxed"><span className="text-green-600 font-semibold underline underline-offset-4 decoration-green-200">Nghĩa:</span> {v.meaning}</p>
-                    {v.example_sentence && (
-                      <div className="mt-3 p-3 bg-gray-50 rounded-xl border-l-4 border-gray-200">
-                        <p className="text-sm text-gray-500 italic">"{v.example_sentence}"</p>
-                      </div>
-                    )}
                   </div>
 
-                  <div className="mt-5 pt-4 border-t border-gray-50 flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Trạng thái</span>
-                    <select
-                      onClick={(e) => e.stopPropagation()}
-                      value={v.status}
-                      onChange={(e) => updateStatus(v.id, e.target.value)}
-                      disabled={updatingId === v.id}
-                      className={`text-xs font-bold px-3 py-1.5 rounded-full border-none outline-none cursor-pointer appearance-none transition-colors ${v.status === "learned" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
-                        }`}
-                    >
-                      <option value="unlearned">Chưa thuộc</option>
-                      <option value="learned">Đã thuộc</option>
-                    </select>
+                  <div className={`w-10 h-10 flex items-center justify-center rounded-2xl transition-all shadow-sm ${v.status === "learned" ? "bg-emerald-500 text-white" : "bg-amber-100 text-amber-600"
+                    }`}>
+                    {v.status === "learned" ? <CheckCircle2 size={20} /> : <Circle size={20} />}
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-20">
-              <p className="text-gray-400 italic">Không tìm thấy từ vựng nào...</p>
-            </div>
-          )}
-        </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-32 text-slate-300">
+            <ImageIcon size={64} strokeWidth={1} className="mb-4 opacity-20" />
+            <p className="font-bold italic uppercase tracking-widest text-sm opacity-50">No words found in your collection</p>
+          </div>
+        )}
       </main>
 
-      {/* 3. FLOATING ACTION BUTTON (FAB) */}
+      {/* 3. FAB (Add Button) */}
       <button
         onClick={() => setIsModalOpen(true)}
-        className="fixed bottom-10 right-10 w-16 h-16 bg-green-600 text-white rounded-full shadow-[0_10px_25px_-5px_rgba(22,163,74,0.4)] hover:bg-green-700 hover:scale-110 active:scale-90 transition-all flex items-center justify-center text-4xl z-40 border-4 border-white"
+        className="fixed bottom-10 right-10 flex items-center gap-3 bg-slate-900 text-white px-7 py-5 rounded-[2rem] shadow-2xl hover:bg-emerald-600 hover:scale-110 active:scale-95 transition-all z-40 group"
       >
-        ＋
+        <Plus size={24} className="group-hover:rotate-90 transition-transform duration-300" />
+        <span className="font-bold text-sm uppercase tracking-widest">New Word</span>
       </button>
 
-      {/* 4. MODAL OVERLAY */}
+      {/* 4. MODAL ADD NEW */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300"
-            onClick={() => setIsModalOpen(false)}
-          ></div>
-
-          <div className="bg-white rounded-[2rem] p-8 w-full max-w-md relative z-10 shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-black text-gray-800 tracking-tight">THÊM TỪ MỚI</h2>
-              <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-500 transition-all">✕</button>
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
+          <div className="relative bg-white rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h2 className="text-xl font-bold text-slate-800 tracking-tight uppercase">Add New Word</h2>
+              <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-red-50 hover:text-red-500 transition-all text-slate-400"><X size={20} /></button>
             </div>
 
-            <form onSubmit={addVocabulary} className="space-y-6">
+            <form onSubmit={addVocabulary} className="p-8 space-y-6">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Từ vựng (English)</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">English Word</label>
                 <input
                   autoFocus
-                  className="w-full px-5 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-400 outline-none transition-all font-medium"
-                  placeholder="Ví dụ: Resilient"
+                  className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold text-lg"
+                  placeholder="e.g. Resilient"
                   value={word}
                   onChange={(e) => setWord(e.target.value)}
                 />
               </div>
+
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Ý nghĩa (Vietnamese)</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Meaning (VN)</label>
                 <input
-                  className="w-full px-5 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-400 outline-none transition-all font-medium"
-                  placeholder="Ví dụ: Kiên cường"
+                  className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-emerald-500 focus:bg-white outline-none transition-all font-medium"
+                  placeholder="e.g. Kiên cường"
                   value={meaning}
                   onChange={(e) => setMeaning(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Ví dụ đặt câu</label>
-                <textarea
-                  className="w-full px-5 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-400 outline-none transition-all font-medium resize-none"
-                  placeholder="Không bắt buộc..."
-                  rows={3}
-                  value={example}
-                  onChange={(e) => setExample(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase ml-1">
-                  Hình minh hoạ
-                </label>
 
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    setImageFile(file);
-                    setImagePreview(URL.createObjectURL(file));
-                  }}
-                  className="block w-full text-sm text-gray-500
-      file:mr-4 file:py-2 file:px-4
-      file:rounded-full file:border-0
-      file:text-sm file:font-semibold
-      file:bg-green-50 file:text-green-700
-      hover:file:bg-green-100"
-                />
-
-                {imagePreview && (
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="mt-3 w-full h-40 object-cover rounded-xl border"
-                  />
-                )}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Illustration</label>
+                <div className="flex items-center gap-4">
+                  <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl py-6 cursor-pointer hover:border-emerald-400 hover:bg-emerald-50 transition-all group">
+                    <ImageIcon className="text-slate-300 group-hover:text-emerald-500 mb-2" size={24} />
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Upload Image</span>
+                    <input type="file" className="hidden" accept="image/*" onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) { setImageFile(file); setImagePreview(URL.createObjectURL(file)); }
+                    }} />
+                  </label>
+                  {imagePreview && <img src={imagePreview} className="w-24 h-24 object-cover rounded-2xl shadow-md border-2 border-white" />}
+                </div>
               </div>
 
               <button
                 type="submit"
                 disabled={adding}
-                className="w-full bg-green-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-green-700 transition-all shadow-lg shadow-green-100 disabled:opacity-50 active:scale-[0.98]"
+                className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold uppercase tracking-[0.2em] text-sm hover:bg-emerald-600 disabled:opacity-50 transition-all shadow-xl shadow-slate-100"
               >
-                {adding ? "ĐANG LƯU..." : "LƯU VÀO BỘ NHỚ"}
+                {adding ? "Saving Data..." : "Store Word"}
               </button>
             </form>
           </div>
         </div>
       )}
+
+      {/* 5. DETAIL MODAL */}
       {isDetailOpen && selectedVocab && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Overlay */}
-          <div
-            onClick={closeDetail}
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in"
-          />
+          <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-md" onClick={() => setIsDetailOpen(false)} />
 
-          {/* Modal */}
-          <div className="relative z-10 w-full max-w-lg bg-white rounded-3xl p-8 shadow-2xl animate-in zoom-in-95">
-            <button
-              onClick={closeDetail}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-500 transition"
-            >
-              ✕
-            </button>
+          <div className="relative bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
 
-            {/* Image */}
+            {/* Container Hình Ảnh - Tối ưu để hiện trọn vẹn */}
             {selectedVocab.image && (
-              <div className="w-full max-h-[40vh] sm:max-h-[50vh] overflow-hidden rounded-2xl mb-6 bg-gray-100">
+              <div className="relative w-full h-80 bg-slate-200 flex items-center justify-center overflow-hidden border-b border-slate-100">
+                {/* Lớp nền mờ để tạo chiều sâu */}
                 <img
                   src={selectedVocab.image}
-                  alt={selectedVocab.word}
-                  className="w-full h-full object-contain sm:object-cover"
+                  className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-30 scale-110"
+                  alt="background blur"
                 />
+                {/* Ảnh chính hiển thị trọn vẹn (Contain) */}
+                <img
+                  src={selectedVocab.image}
+                  className="relative z-10 max-w-full max-h-full object-contain p-2 transition-transform hover:scale-105 duration-500"
+                  alt={selectedVocab.word}
+                />
+
+                <div className="absolute top-4 right-4 z-20">
+                  <button
+                    onClick={() => setIsDetailOpen(false)}
+                    className="bg-black/20 hover:bg-black/40 backdrop-blur-md text-white p-2 rounded-full transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
             )}
 
+            {/* Nội dung text bên dưới */}
+            <div className="p-8">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h2 className="text-4xl font-bold text-slate-800 uppercase tracking-tighter leading-none mb-2">
+                    {selectedVocab.word}
+                  </h2>
+                  <div className="flex gap-2">
+                    <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-lg uppercase tracking-widest">
+                      Vocab
+                    </span>
+                    <span className={`px-3 py-1 text-[10px] font-bold rounded-lg uppercase tracking-widest ${selectedVocab.status === 'learned' ? 'bg-emerald-500 text-white' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                      {selectedVocab.status === 'learned' ? 'Mastered' : 'Learning'}
+                    </span>
+                  </div>
+                </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <h2 className="text-3xl font-black text-green-600">
-                  {selectedVocab.word}
-                </h2>
                 <button
                   onClick={() => speakEnglish(selectedVocab.word)}
-                  className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white transition"
+                  className="w-14 h-14 bg-emerald-500 text-white rounded-2xl flex items-center justify-center hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200 active:scale-90"
                 >
-                  🔊
+                  <Volume2 size={28} />
                 </button>
               </div>
 
-              <p className="text-gray-700 text-lg leading-relaxed">
-                <span className="font-bold text-gray-900">Nghĩa:</span>{" "}
-                {selectedVocab.meaning}
-              </p>
-
-              {selectedVocab.example_sentence && (
-                <div className="bg-gray-50 border-l-4 border-green-400 rounded-xl p-4">
-                  <p className="italic text-gray-600">
-                    "{selectedVocab.example_sentence}"
+              <div className="space-y-6">
+                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-2">Định nghĩa</h4>
+                  <p className="text-xl text-slate-700 font-bold leading-relaxed">
+                    {selectedVocab.meaning}
                   </p>
                 </div>
-              )}
 
-              <div className="pt-4 border-t flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                  Trạng thái
-                </span>
-                <span
-                  className={`text-xs font-bold px-3 py-1.5 rounded-full ${selectedVocab.status === "learned"
-                    ? "bg-green-100 text-green-700"
-                    : "bg-orange-100 text-orange-700"
-                    }`}
-                >
-                  {selectedVocab.status === "learned" ? "Đã thuộc" : "Chưa thuộc"}
-                </span>
+                {selectedVocab.example_sentence && (
+                  <div className="p-5">
+                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-2">Ví dụ sử dụng</h4>
+                    <p className="text-lg italic text-slate-500 border-l-4 border-emerald-300 pl-4 font-serif leading-relaxed">
+                      "{selectedVocab.example_sentence}"
+                    </p>
+                  </div>
+                )}
               </div>
+
+              <button
+                onClick={() => setIsDetailOpen(false)}
+                className="mt-8 w-full py-4 bg-slate-900 text-white rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-emerald-600 transition-all shadow-lg"
+              >
+                Đóng chi tiết
+              </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }
